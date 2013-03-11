@@ -53,13 +53,13 @@ int send_msearch() {
   recvaddr.sin_port = htons(59000);
   recvaddr.sin_addr.s_addr = INADDR_ANY;
   bind(sock, (struct sockaddr *) &recvaddr, sizeof(recvaddr));
-  fprintf(stderr, "sendto start\n");
+  fprintf(stdout, "sendto start\n");
   if (sendto(sock, sndbuf, strlen(sndbuf), 0, (struct sockaddr *) &sendaddr,
              sizeof(sendaddr)) < 0) {
     fprintf(stderr, "sendto error\n");
     return -1;
   }
-  fprintf(stderr, "sendto end\nrcvfrom start\n");
+  fprintf(stdout, "sendto end\nrcvfrom start\n");
   memset(recvbuf, 0, sizeof(recvbuf));
   if (recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *) &recvaddr,
                &sin_size) < 0) {
@@ -273,7 +273,7 @@ int recv_and_reply(int client_id) {
 //  read_size = recv(client_info[client_id].sock, buf, sizeof(buf) - 1, 0);
   read_size = recvfrom(client_info[client_id].sock, buf, sizeof(buf), 0, NULL,
                        NULL );
-  fprintf(stderr, "[%s][%s][l.%d] %d\n", __FILE__, __FUNCTION__, __LINE__,
+  fprintf(stdout, "[%s][%s][l.%d] %d\n", __FILE__, __FUNCTION__, __LINE__,
           read_size);
 #endif
 
@@ -285,7 +285,7 @@ int recv_and_reply(int client_id) {
   } else {
     /* 応答を送信する */
     buf[read_size] = '\0';
-    fprintf(stderr, "recv: ip=%s  port=%d  fd=%d  --> %s",
+    fprintf(stdout, "recv: ip=%s  port=%d  fd=%d  --> %s",
             client_info[client_id].ipaddr, client_info[client_id].port,
             client_info[client_id].sock, buf);
     write(client_info[client_id].sock, buf, strlen(buf));
@@ -334,7 +334,8 @@ unsigned char is_timeout(int client_id) {
  *----------------------------------------------------------------------------*/
 int main(void) {
   struct sockaddr_in server;
-  int listen_sock;
+  int ssdp_sock;
+  int gena_sock;
   fd_set master_rfds;
   fd_set work_rfds;
   int sock_optval = 1;
@@ -352,20 +353,25 @@ int main(void) {
 
 #ifdef MODE_TCP
   /* リッスンソケットを作成 */
-  listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-#else
-  /* リッスンソケットを作成 */
-  listen_sock = socket(AF_INET, SOCK_DGRAM, 0);
-  client_info[0].sock = listen_sock;
-#endif
-  if (listen_sock < 0) {
-    perror("socket");
+  gena_sock = socket(AF_INET, SOCK_STREAM, 0);
+  client_info[1].sock = gena_sock;
+  if (gena_sock < 0) {
+    perror("socket gena_sock");
     exit(1);
   }
+#else
+  /* リッスンソケットを作成 */
+  ssdp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+  client_info[0].sock = ssdp_sock;
+  if (ssdp_sock < 0) {
+    perror("socket ssdp_sock");
+    exit(1);
+  }
+#endif
 
 #ifdef MODE_TCP
   /* ソケットオプション設定 */
-  if ( setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR,
+  if ( setsockopt(gena_sock, SOL_SOCKET, SO_REUSEADDR,
           &sock_optval, sizeof(sock_optval)) < 0 ) {
     perror("setsockopt");
     exit(1);
@@ -377,18 +383,26 @@ int main(void) {
   server.sin_port = htons(SERVER_PORT);
   server.sin_addr.s_addr = htonl(INADDR_ANY);
 
-  if (bind(listen_sock, (struct sockaddr *) &server, sizeof(server)) < 0) {
-    perror("bind");
-    close(listen_sock);
+#ifdef MODE_TCP
+  if (bind(gena_sock, (struct sockaddr *) &server, sizeof(server)) < 0) {
+    perror("bind gena");
+    close(gena_sock);
     exit(1);
   }
+#else
+  if (bind(ssdp_sock, (struct sockaddr *) &server, sizeof(server)) < 0) {
+    perror("bind ssdp");
+    close(ssdp_sock);
+    exit(1);
+  }
+#endif
 
 #ifndef MODE_TCP
   memset(&ssdp_mreq, 0, sizeof(ssdp_mreq));
   ssdp_mreq.imr_multiaddr.s_addr = inet_addr("239.255.255.250");
   ssdp_mreq.imr_interface.s_addr = INADDR_ANY;
-  if (setsockopt(listen_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-                 (char *) &ssdp_mreq, sizeof(ssdp_mreq)) < 0) {
+  if (setsockopt(ssdp_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &ssdp_mreq,
+                 sizeof(ssdp_mreq)) < 0) {
     perror("setsockopt");
     exit(1);
   }
@@ -396,21 +410,25 @@ int main(void) {
 
 #ifdef MODE_TCP
   /* コネクション接続要求の受信キューの長さを設定 */
-  if ( listen(listen_sock, LISTEN_NUM) < 0 ) {
+  if ( listen(gena_sock, LISTEN_NUM) < 0 ) {
     perror("listen");
-    close(listen_sock);
+    close(gena_sock);
     exit(1);
   }
 
-  fprintf(stderr,"listen port number -> %d\n", SERVER_PORT);
+  fprintf(stdout,"listen port number -> %d\n", SERVER_PORT);
 #else
 #endif
 
   /* fd_setの設定 */
-  FD_ZERO(&master_rfds);
   /* 監視するfd_setをゼロクリア */
-  FD_SET(listen_sock, &master_rfds);
-  /* リッスンソケットを監視対象に追加 */
+  FD_ZERO(&master_rfds);
+  /* ソケットを監視対象に追加 */
+#ifdef MODE_TCP
+  FD_SET(gena_sock, &master_rfds);
+#else
+  FD_SET(ssdp_sock, &master_rfds);
+#endif
 
   /*
    * メインループ
@@ -419,25 +437,28 @@ int main(void) {
 
     int i;
     time_t now_time;
+#ifdef TIMEOUT
     struct timeval tv; /* select のタイムアウト時間 */
 
     /* タイムアウト時間を10秒に設定 */
     tv.tv_sec = 10;
     tv.tv_usec = 0;
+#endif
 
     /* master_rfds を work_rfds にコピー */
     memcpy(&work_rfds, &master_rfds, sizeof(master_rfds));
 
-    fprintf(stderr, "wait select. listen_sock = %d, client_info[0].sock = %d\n",
-            listen_sock, client_info[0].sock);
+    fprintf(stdout, "wait select. listen_sock = %d, client_info[0].sock = %d\n",
+            ssdp_sock, client_info[0].sock);
 
     /*
      * ソケットを監視
      */
-#ifdef MODE_TCP
+#ifdef TIMEOUT
     ret = select(FD_SETSIZE, &work_rfds, NULL, NULL, &tv);
 #else
-    ret = select(listen_sock + 1, &work_rfds, NULL, NULL, NULL );
+//    ret = select(ssdp_sock + 1, &work_rfds, NULL, NULL, NULL );
+    ret = select(FD_SETSIZE, &work_rfds, NULL, NULL, NULL );
 #endif
 
     if (ret < 0) {
@@ -473,15 +494,15 @@ int main(void) {
      * 状態が変化したソケットを確認する
      *   --- リッスンソケットの状態を確認
      */
-    if (FD_ISSET( listen_sock, &work_rfds )) { /* 状態を確認 */
+    if (FD_ISSET( ssdp_sock, &work_rfds )) { /* 状態を確認 */
 
       int new_sock;
 
-      fprintf(stderr, "state change: listen-socket(%d)\n", listen_sock);
+      fprintf(stdout, "state change: listen-socket(%d)\n", ssdp_sock);
 
 #ifdef MODE_TCP
       /* コネクション確立要求を受理する */
-      new_sock = accept_connection(listen_sock);
+      new_sock = accept_connection(ssdp_sock);
       if ( new_sock != -1 ) {
         /* 監視対象に新たなソケットを追加 */
         FD_SET(new_sock, &master_rfds);
@@ -502,7 +523,7 @@ int main(void) {
       /* 状態を確認 */
       if (FD_ISSET( client_info[i].sock, &work_rfds )) {
 
-        fprintf(stderr, "state change: socket(%d)\n", client_info[i].sock);
+        fprintf(stdout, "state change: socket(%d)\n", client_info[i].sock);
 
         /* echo処理 */
         ret = recv_and_reply(i);
@@ -519,7 +540,7 @@ int main(void) {
 
   } /* while (1) */
 
-  close(listen_sock);
+  close(ssdp_sock);
 
   return 0;
 }
