@@ -20,6 +20,7 @@
 
 #include "ssdp.h"
 
+#if 0
 int send_msearch() {
   int sock;
   struct sockaddr_in sendaddr;
@@ -27,8 +28,8 @@ int send_msearch() {
   struct sockaddr_in server;
   socklen_t sin_size;
   char sndbuf[] =
-      "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n"
-          "MAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-upnp-org:device:MediaServer:1";
+  "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n"
+  "MAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-upnp-org:device:MediaServer:1";
   char recvbuf[4096];
   char *recvbuf_split;
   char *location;
@@ -36,8 +37,8 @@ int send_msearch() {
   char *port;
   char *xml;
   int n;
-  char tcp_send_buf[4096] = { 0 };
-  char tcp_recv_buf[4096] = { 0 };
+  char tcp_send_buf[4096] = {0};
+  char tcp_recv_buf[4096] = {0};
   /**
    * M-SEARCH
    */
@@ -56,14 +57,14 @@ int send_msearch() {
   bind(sock, (struct sockaddr *) &recvaddr, sizeof(recvaddr));
   fprintf(stdout, "sendto start\n");
   if (sendto(sock, sndbuf, strlen(sndbuf), 0, (struct sockaddr *) &sendaddr,
-             sizeof(sendaddr)) < 0) {
+          sizeof(sendaddr)) < 0) {
     perror("sendto");
     return -1;
   }
   fprintf(stdout, "sendto end\nrcvfrom start\n");
   memset(recvbuf, 0, sizeof(recvbuf));
   if (recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *) &recvaddr,
-               &sin_size) < 0) {
+          &sin_size) < 0) {
     perror("recvfrom");
     return -1;
   }
@@ -71,7 +72,7 @@ int send_msearch() {
   fprintf(stdout, "%s\n", recvbuf);
 
   // LOCATIONからIP,Port,XMLを取得
-  for (recvbuf_split = strtok(recvbuf, "\r\n"); recvbuf_split != NULL ;
+  for (recvbuf_split = strtok(recvbuf, "\r\n"); recvbuf_split != NULL;
       recvbuf_split = strtok(NULL, "\r\n")) {
     location = strstr(recvbuf_split, "LOCATION: http://");
     if (location != NULL ) {
@@ -148,6 +149,7 @@ int send_msearch() {
 
   return 0;
 }
+#endif
 
 /*
  * echoサーバ (TCP + select版)
@@ -347,6 +349,9 @@ int main(void) {
 #endif
 
 #if 1 /* test */
+  send_msearch();
+  return 0;
+#else
   ssdp_init();
   return 0;
 #endif
