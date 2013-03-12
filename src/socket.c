@@ -14,10 +14,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
 #include <time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+
+#include "ssdp.h"
 
 int send_msearch() {
   int sock;
@@ -42,7 +43,7 @@ int send_msearch() {
    */
   sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock < 0) {
-    fprintf(stderr, "socket err\n");
+    perror("socket");
     return -1;
   }
   sendaddr.sin_family = AF_INET;
@@ -56,25 +57,25 @@ int send_msearch() {
   fprintf(stdout, "sendto start\n");
   if (sendto(sock, sndbuf, strlen(sndbuf), 0, (struct sockaddr *) &sendaddr,
              sizeof(sendaddr)) < 0) {
-    fprintf(stderr, "sendto error\n");
+    perror("sendto");
     return -1;
   }
   fprintf(stdout, "sendto end\nrcvfrom start\n");
   memset(recvbuf, 0, sizeof(recvbuf));
   if (recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *) &recvaddr,
                &sin_size) < 0) {
-    fprintf(stderr, "recvfrom error\n");
+    perror("recvfrom");
     return -1;
   }
 
-  fprintf(stderr, "%s\n", recvbuf);
+  fprintf(stdout, "%s\n", recvbuf);
 
   // LOCATIONからIP,Port,XMLを取得
   for (recvbuf_split = strtok(recvbuf, "\r\n"); recvbuf_split != NULL ;
       recvbuf_split = strtok(NULL, "\r\n")) {
     location = strstr(recvbuf_split, "LOCATION: http://");
     if (location != NULL ) {
-      fprintf(stderr, "location = %s\n", location);
+      fprintf(stdout, "location = %s\n", location);
       ip = strtok(location + strlen("LOCATION: http://"), ":");
       if (ip != NULL ) {
         port = strtok(NULL, "/");
@@ -82,9 +83,9 @@ int send_msearch() {
           xml = strtok(NULL, "\n");
         }
       }
-      fprintf(stderr, "ip = %s\n", ip);
-      fprintf(stderr, "port = %s\n", port);
-      fprintf(stderr, "xml = %s\n", xml);
+      fprintf(stdout, "ip = %s\n", ip);
+      fprintf(stdout, "port = %s\n", port);
+      fprintf(stdout, "xml = %s\n", xml);
       break;
     }
   }
@@ -121,7 +122,7 @@ int send_msearch() {
   strcat(tcp_send_buf, ":");
   strcat(tcp_send_buf, port);
   strcat(tcp_send_buf, "\r\n\r\n");
-  fprintf(stderr, "\n%s\n", tcp_send_buf);
+  fprintf(stdout, "\n%s\n", tcp_send_buf);
   n = send(sock, tcp_send_buf, strlen(tcp_send_buf), 0);
   if (n < 0) {
     perror("send");
@@ -141,7 +142,7 @@ int send_msearch() {
 
   /* 表示 */
   tcp_recv_buf[n] = '\0';
-  fprintf(stderr, "%s(recv from %s)\n\n", tcp_recv_buf, ip);
+  fprintf(stdout, "%s(recv from %s)\n\n", tcp_recv_buf, ip);
 
   close(sock);
 
@@ -343,6 +344,11 @@ int main(void) {
   int ret;
 #ifndef MODE_TCP
   struct ip_mreq ssdp_mreq;
+#endif
+
+#if 1 /* test */
+  ssdp_init();
+  return 0;
 #endif
 
 //  fprintf(stderr, "[%s][%s][l.%d]\n", __FILE__, __FUNCTION__, __LINE__);
