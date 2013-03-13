@@ -348,7 +348,7 @@ int main(void) {
   struct ip_mreq ssdp_mreq;
 #endif
 
-#if 1 /* test */
+#if 0 /* test */
   send_msearch();
   return 0;
 #else
