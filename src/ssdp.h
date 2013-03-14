@@ -8,7 +8,13 @@
 #ifndef SSDP_H_
 #define SSDP_H_
 
-int send_msearch();
-int ssdp_init();
+#include "gena.h"
+
+typedef struct GENA_THREAD_INFO {
+  pthread_t thread;
+  GENA_INFO gena;
+} GENA_THREAD_INFO;
+
+int create_ssdp_thread();
 
 #endif /* SSDP_H_ */

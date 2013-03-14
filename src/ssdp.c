@@ -82,6 +82,8 @@ void *ssdp_looper() {
   FD_ZERO(&master_rfds);
   FD_SET(sock, &master_rfds);
 
+  send_msearch();
+
   while (1) {
     memcpy(&work_rfds, &master_rfds, sizeof(master_rfds));
 
@@ -92,7 +94,7 @@ void *ssdp_looper() {
     }
 
     if (FD_ISSET( sock, &work_rfds )) {
-      char rbuf[BUFSIZ];
+      char rbuf[2048];
       if (recvfrom(sock, rbuf, sizeof(rbuf), 0, NULL, NULL ) <= 0) {
         perror("recvfrom ssdp");
         close(sock);
@@ -100,6 +102,9 @@ void *ssdp_looper() {
       }
       fprintf(stdout, "===============================\n");
       fprintf(stdout, "%s\n", rbuf);
+      // 受信したNOTIFYより、LOCATIONをパースしてIP,PORT,XMLを取得
+      // 受信のたびにスレッドを起こし、DESCRIPTIONが取れたらそのスレッドは終了
+      // スレッドは管理しておき、重複するスレッドが起動している場合は、スレッドを立てないようにする
     }
   } /* while (1) */
 
@@ -108,10 +113,10 @@ void *ssdp_looper() {
   return (void *) NULL ;
 }
 
-int ssdp_init() {
+int create_ssdp_thread() {
   pthread_t thread;
   if (pthread_create(&thread, NULL, ssdp_looper, NULL ) != 0) {
-    perror("pthread_create");
+    perror("pthread_create ssdp");
     return DLNA_FAILURE;
   }
   pthread_join(thread, NULL );

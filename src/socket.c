@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 
 #include "ssdp.h"
+#include "gena.h"
 
 #if 0
 int send_msearch() {
@@ -348,11 +349,13 @@ int main(void) {
   struct ip_mreq ssdp_mreq;
 #endif
 
-#if 0 /* test */
-  send_msearch();
+#if 1 /* test */
+  pthread_t thread;
+  GENA_INFO info = { "192.168.0.10", 11111, "aaa.xml" };
+  create_gena_thread(&thread, &info);
   return 0;
 #else
-  ssdp_init();
+  create_ssdp_thread();
   return 0;
 #endif
 
