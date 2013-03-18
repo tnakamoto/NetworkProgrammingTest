@@ -24,17 +24,18 @@ int send_msearch() {
 
   sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock < 0) {
-    perror("socket");
+    perror("socket msearch");
     return DLNA_FAILURE;
   }
 
+  memset(&sendaddr, 0, sizeof(sendaddr));
   sendaddr.sin_family = AF_INET;
   sendaddr.sin_port = htons(1900);
   sendaddr.sin_addr.s_addr = inet_addr("239.255.255.250");
 
   if (sendto(sock, sendbuf, strlen(sendbuf), 0, (struct sockaddr *) &sendaddr,
              sizeof(sendaddr)) < 0) {
-    perror("sendto");
+    perror("sendto msearch");
     close(sock);
     return DLNA_FAILURE;
   }
