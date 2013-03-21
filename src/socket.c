@@ -351,7 +351,7 @@ int main(void) {
 
 #if 1 /* test */
   pthread_t thread;
-  GENA_INFO info = { "192.168.11.55", 8080, "description.xml" };
+  GENA_INFO info = { "192.168.11.46", 8080, "description.xml" };
   create_gena_thread(&thread, &info);
   return 0;
 #else
