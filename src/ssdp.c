@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -14,6 +15,7 @@
 #include <arpa/inet.h>
 
 #include "dlna.h"
+#include "ssdp.h"
 
 int send_msearch() {
   int sock;
@@ -42,6 +44,34 @@ int send_msearch() {
 
   close(sock);
 
+  return DLNA_SUCCESS;
+}
+
+// LOCATIONからIP,PORT,XMLを取得
+int parse_location(char recvbuf[], char ip[], int *port, char xml[]) {
+  char *recvbuf_split;
+  char *location_tmp;
+  char *ip_tmp;
+  char *port_tmp;
+  char *xml_tmp;
+
+  for (recvbuf_split = strtok(recvbuf, "\r\n"); recvbuf_split != NULL ;
+      recvbuf_split = strtok(NULL, "\r\n")) {
+    location_tmp = strstr(recvbuf_split, "LOCATION: http://");
+    if (location_tmp != NULL ) {
+      ip_tmp = strtok(location_tmp + strlen("LOCATION: http://"), ":");
+      memcpy(ip, ip_tmp, 15);
+      if (ip_tmp != NULL ) {
+        port_tmp = strtok(NULL, "/");
+        *port = atoi(port_tmp);
+        if (port_tmp != NULL ) {
+          xml_tmp = strtok(NULL, "\n");
+          strcpy(xml, xml_tmp);
+        }
+      }
+      break;
+    }
+  }
   return DLNA_SUCCESS;
 }
 
@@ -95,17 +125,25 @@ void *ssdp_looper() {
     }
 
     if (FD_ISSET( sock, &work_rfds )) {
-      char rbuf[2048];
+      char rbuf[2048] = { 0 };
       if (recvfrom(sock, rbuf, sizeof(rbuf), 0, NULL, NULL ) <= 0) {
         perror("recvfrom ssdp");
         close(sock);
         pthread_exit(NULL );
       }
-      fprintf(stdout, "===============================\n");
+      fprintf(stdout, "\n================================================\n");
       fprintf(stdout, "%s\n", rbuf);
-      // 受信したNOTIFYより、LOCATIONをパースしてIP,PORT,XMLを取得
-      // 受信のたびにスレッドを起こし、DESCRIPTIONが取れたらそのスレッドは終了
-      // スレッドは管理しておき、重複するスレッドが起動している場合は、スレッドを立てないようにする
+      // LOCATION付きaliveを受信するたびにスレッドを起こし、DESCRIPTIONが取れたらそのスレッドは終了
+      // TODO: スレッドを管理し、重複するスレッドが起動している場合は、スレッドを立てないようにする
+      if (strstr(rbuf, "ssdp:alive") != NULL
+          && strstr(rbuf, "LOCATION") != NULL ) {
+        pthread_t thread;
+        GENA_INFO info;
+        memset(&info, 0, sizeof(GENA_INFO));
+        // 受信したNOTIFYより、LOCATIONをパースしてIP,PORT,XMLを取得
+        parse_location(rbuf, info.ip, &info.port, info.xml);
+        create_gena_thread(&thread, &info);
+      }
     }
   } /* while (1) */
 

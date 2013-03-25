@@ -349,7 +349,7 @@ int main(void) {
   struct ip_mreq ssdp_mreq;
 #endif
 
-#if 1 /* test */
+#if 0 /* test */
   pthread_t thread;
   GENA_INFO info = { "192.168.11.46", 8080, "description.xml" };
   create_gena_thread(&thread, &info);

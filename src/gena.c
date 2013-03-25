@@ -56,6 +56,7 @@ void *gena_looper(void *arg) {
   }
 
   do {
+    memset(recvbuf, 0, sizeof(recvbuf));
     recvbyte = recv(sock, recvbuf, sizeof(recvbuf), 0);
     if (recvbyte < 0) {
       perror("recv description");
@@ -72,10 +73,11 @@ void *gena_looper(void *arg) {
       content_length -= recvbyte;
     }
     /* 表示 */
-    recvbuf[recvbyte] = '\0';
+//    recvbuf[recvbyte] = '\0';
     fprintf(stdout, "%s", recvbuf);
   } while (content_length > 0);
 
+  fprintf(stdout, "\n================================================\n");
   close(sock);
   return (void *) NULL ;
 }
@@ -85,7 +87,7 @@ int create_gena_thread(pthread_t *thread, GENA_INFO *gena) {
     perror("pthread_create gena");
     return DLNA_FAILURE;
   }
-  pthread_join(*thread, NULL );
+//  pthread_join(*thread, NULL );
   return DLNA_SUCCESS;
 }
 
